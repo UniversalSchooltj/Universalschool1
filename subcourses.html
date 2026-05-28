@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ПОДКУРСЫ — Кластеры знаний</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Geologica:wght@300;400;700;900&family=JetBrains+Mono:wght@300;400&display=swap');
+
+  :root {
+    --bg: #080810;
+    --fg: #f0ece0;
+    --accent1: #ff4d1c;
+    --accent2: #00e5ff;
+    --accent3: #b8ff3a;
+    --accent4: #ff2d78;
+    --muted: rgba(240,236,224,0.35);
+    --card-bg: rgba(255,255,255,0.035);
+    --border: rgba(255,255,255,0.08);
+  }
+
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Geologica', sans-serif;
+    overflow-x: hidden;
+    cursor: none;
+  }
+
+  /* ─── CUSTOM CURSOR ─── */
+  #cursor {
+    position: fixed; top:0; left:0; z-index:9999;
+    pointer-events: none;
+  }
+  #cursor-dot {
+    position:absolute; width:8px; height:8px;
+    background: var(--accent2);
+    border-radius:50%;
+    transform: translate(-50%,-50%);
+    transition: transform .1s;
+  }
+  #cursor-ring {
+    position:absolute; width:40px; height:40px;
+    border:1.5px solid rgba(0,229,255,0.5);
+    border-radius:50%;
+    transform: translate(-50%,-50%);
+    transition: transform .15s ease, width .3s ease, height .3s ease, border-color .3s ease;
+  }
+  body:has(a:hover) #cursor-ring,
+  body:has(button:hover) #cursor-ring,
+  body:has(.card:hover) #cursor-ring {
+    width:70px; height:70px;
+    border-color: var(--accent1);
+  }
+
+  /* ─── CANVAS ─── */
+  #bg-canvas {
+    position: fixed; inset:0; z-index:0;
+    pointer-events:none;
+  }
+
+  /* ─── NAV ─── */
+  nav {
+    position: fixed; top:0; left:0; right:0; z-index:100;
+    display: flex; align-items:center; justify-content:space-between;
+    padding: 1.5rem 3rem;
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    background: rgba(8,8,16,0.6);
+  }
+  .nav-logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.6rem; letter-spacing:0.12em;
+    color: var(--fg);
+    text-decoration:none;
+  }
+  .nav-logo span { color: var(--accent2); }
+  .nav-links { display:flex; gap:2.5rem; list-style:none; }
+  .nav-links a {
+    font-size:.78rem; letter-spacing:.15em; text-transform:uppercase;
+    color: var(--muted); text-decoration:none;
+    font-family: 'JetBrains Mono', monospace;
+    transition: color .25s;
+  }
+  .nav-links a:hover { color: var(--fg); }
+  .nav-cta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size:.75rem; letter-spacing:.12em; text-transform:uppercase;
+    padding:.6rem 1.4rem;
+    border:1px solid var(--accent2);
+    color: var(--accent2);
+    background:transparent;
+    cursor:none;
+    transition: background .25s, color .25s;
+    text-decoration:none;
+  }
+  .nav-cta:hover { background:var(--accent2); color: var(--bg); }
+
+  /* ─── HERO ─── */
+  #hero {
+    position:relative; z-index:1;
+    min-height:100vh;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    text-align:center;
+    padding:2rem;
+    overflow:hidden;
+  }
+  .hero-tag {
+    font-family:'JetBrains Mono',monospace;
+    font-size:.72rem; letter-spacing:.25em; text-transform:uppercase;
+    color: var(--accent2);
+    margin-bottom: 2rem;
+    opacity:0;
+    animation: fadeUp .8s .3s forwards;
+  }
+  .hero-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(5rem, 14vw, 14rem);
+    line-height:.92;
+    letter-spacing:-.01em;
+    opacity:0;
+    animation: fadeUp .9s .5s forwards;
+  }
+  .hero-title .line2 { color:transparent; -webkit-text-stroke:1px var(--fg); display:block; }
+  .hero-title .accent-word { color: var(--accent1); }
+  .hero-sub {
+    max-width:520px;
+    font-size:1rem; font-weight:300; line-height:1.7;
+    color: var(--muted);
+    margin-top:2rem;
+    opacity:0;
+    animation: fadeUp .8s .8s forwards;
+  }
+  .hero-scroll {
+    position:absolute; bottom:2.5rem; left:50%; transform:translateX(-50%);
+    display:flex; flex-direction:column; align-items:center; gap:.5rem;
+    opacity:0; animation: fadeUp .8s 1.2s forwards;
+  }
+  .hero-scroll span {
+    font-family:'JetBrains Mono',monospace; font-size:.65rem; letter-spacing:.2em; text-transform:uppercase; color:var(--muted);
+  }
+  .scroll-line {
+    width:1px; height:50px; background:linear-gradient(to bottom, var(--accent2), transparent);
+    animation: scrollPulse 2s infinite;
+  }
+  @keyframes scrollPulse { 0%,100%{opacity:.3;transform:scaleY(1)} 50%{opacity:1;transform:scaleY(1.3)} }
+
+  /* ─── MARQUEE ─── */
+  .marquee-wrap {
+    position:relative; z-index:1;
+    overflow:hidden;
+    border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+    padding:.8rem 0;
+    background: rgba(255,77,28,0.04);
+  }
+  .marquee-inner {
+    display:flex; gap:3rem; white-space:nowrap;
+    animation: marquee 25s linear infinite;
+    width: max-content;
+  }
+  .marquee-item {
+    font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:.15em;
+    color:var(--muted);
+  }
+  .marquee-item span { color:var(--accent1); margin:0 .5rem; }
+  @keyframes marquee { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+  /* ─── STATS ─── */
+  #stats {
+    position:relative; z-index:1;
+    display:grid; grid-template-columns:repeat(4,1fr);
+    gap:0;
+    border-bottom:1px solid var(--border);
+  }
+  .stat {
+    padding: 3rem 2rem;
+    border-right:1px solid var(--border);
+    text-align:center;
+    opacity:0; transform:translateY(20px);
+    transition: opacity .6s, transform .6s;
+  }
+  .stat:last-child { border-right:none; }
+  .stat.visible { opacity:1; transform:none; }
+  .stat-num {
+    font-family:'Bebas Neue',sans-serif; font-size:4rem; line-height:1;
+    color:var(--fg);
+  }
+  .stat-num .unit { font-size:2rem; color:var(--accent2); }
+  .stat-label { font-size:.75rem; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); margin-top:.5rem; font-family:'JetBrains Mono',monospace; }
+
+  /* ─── SECTION HEADER ─── */
+  .section-header {
+    position:relative; z-index:1;
+    padding: 6rem 3rem 3rem;
+    display:flex; align-items:flex-end; justify-content:space-between;
+    gap:2rem;
+  }
+  .section-eyebrow {
+    font-family:'JetBrains Mono',monospace;
+    font-size:.7rem; letter-spacing:.25em; text-transform:uppercase; color:var(--accent2);
+    margin-bottom:.75rem;
+  }
+  .section-title {
+    font-family:'Bebas Neue',sans-serif;
+    font-size:clamp(3rem,6vw,6rem); line-height:.95;
+  }
+  .section-desc { max-width:340px; font-size:.9rem; font-weight:300; color:var(--muted); line-height:1.7; }
+
+  /* ─── CLUSTERS GRID ─── */
+  #clusters {
+    position:relative; z-index:1;
+    padding: 1rem 3rem 6rem;
+  }
+  .clusters-grid {
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap:1.5px;
+    background:var(--border);
+  }
+  .card {
+    background: var(--bg);
+    padding: 2.5rem;
+    position:relative; overflow:hidden;
+    cursor:none;
+    transition: background .3s;
+  }
+  .card::before {
+    content:'';
+    position:absolute; inset:0;
+    background: radial-gradient(ellipse at 20% 20%, var(--card-glow,rgba(0,229,255,0.07)) 0%, transparent 65%);
+    opacity:0; transition: opacity .4s;
+  }
+  .card:hover::before { opacity:1; }
+  .card:hover { background: rgba(255,255,255,0.04); }
+  .card-num {
+    font-family:'JetBrains Mono',monospace; font-size:.65rem;
+    color:var(--muted); letter-spacing:.15em; margin-bottom:1.5rem;
+  }
+  .card-icon {
+    font-size:2.8rem; margin-bottom:1.2rem;
+    display:block;
+    animation: floatIcon 4s ease-in-out infinite;
+  }
+  @keyframes floatIcon { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+  .card-title {
+    font-family:'Bebas Neue',sans-serif;
+    font-size:1.8rem; letter-spacing:.05em; line-height:1;
+    margin-bottom:.8rem;
+  }
+  .card-desc {
+    font-size:.82rem; font-weight:300; color:var(--muted); line-height:1.65;
+    margin-bottom:1.5rem;
+  }
+  .card-tags { display:flex; flex-wrap:wrap; gap:.4rem; margin-bottom:1.8rem; }
+  .tag {
+    font-family:'JetBrains Mono',monospace; font-size:.6rem; letter-spacing:.1em; text-transform:uppercase;
+    padding:.28rem .7rem;
+    border:1px solid var(--border);
+    color:var(--muted);
+    border-radius:2px;
+    transition: border-color .25s, color .25s;
+  }
+  .card:hover .tag { border-color:rgba(255,255,255,0.2); color:var(--fg); }
+  .card-footer { display:flex; align-items:center; justify-content:space-between; }
+  .card-courses {
+    font-family:'JetBrains Mono',monospace; font-size:.68rem; color:var(--muted); letter-spacing:.08em;
+  }
+  .card-arrow {
+    width:32px; height:32px; border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center;
+    border-radius:50%;
+    color:var(--muted); font-size:.9rem;
+    transition: background .25s, border-color .25s, color .25s, transform .25s;
+  }
+  .card:hover .card-arrow { background:var(--card-accent,var(--accent2)); border-color:transparent; color:var(--bg); transform:rotate(45deg); }
+
+  /* card accent colors */
+  .card[data-cluster="1"] { --card-glow:rgba(255,77,28,0.1); --card-accent:var(--accent1); }
+  .card[data-cluster="2"] { --card-glow:rgba(0,229,255,0.1); --card-accent:var(--accent2); }
+  .card[data-cluster="3"] { --card-glow:rgba(184,255,58,0.1); --card-accent:var(--accent3); color:inherit; }
+  .card[data-cluster="4"] { --card-glow:rgba(255,45,120,0.1); --card-accent:var(--accent4); }
+  .card[data-cluster="5"] { --card-glow:rgba(255,200,0,0.1); --card-accent:#ffc800; }
+  .card[data-cluster="6"] { --card-glow:rgba(130,80,255,0.1); --card-accent:#8250ff; }
+
+  .card-title-color-1 { color:var(--accent1); }
+  .card-title-color-2 { color:var(--accent2); }
+  .card-title-color-3 { color:var(--accent3); }
+  .card-title-color-4 { color:var(--accent4); }
+  .card-title-color-5 { color:#ffc800; }
+  .card-title-color-6 { color:#8250ff; }
+
+  /* ─── FEATURED COURSES ─── */
+  #featured {
+    position:relative; z-index:1;
+    padding: 0 3rem 6rem;
+  }
+  .featured-list { display:flex; flex-direction:column; gap:1.5px; background:var(--border); }
+  .course-row {
+    display:grid; grid-template-columns:80px 1fr 180px 120px 60px;
+    align-items:center; gap:2rem;
+    padding: 1.8rem 2.5rem;
+    background:var(--bg);
+    transition: background .3s;
+    cursor:none;
+    opacity:0; transform:translateX(-20px);
+    transition: opacity .5s, transform .5s, background .3s;
+  }
+  .course-row.visible { opacity:1; transform:none; }
+  .course-row:hover { background:rgba(255,255,255,0.04); }
+  .course-idx {
+    font-family:'JetBrains Mono',monospace; font-size:.7rem; color:var(--muted); letter-spacing:.1em;
+  }
+  .course-name { font-size:1rem; font-weight:400; }
+  .course-cluster {
+    font-family:'JetBrains Mono',monospace; font-size:.68rem;
+    padding:.2rem .8rem; border-radius:2px; border:1px solid var(--border);
+    color:var(--muted); text-align:center; letter-spacing:.08em; text-transform:uppercase;
+  }
+  .course-level {
+    font-family:'JetBrains Mono',monospace; font-size:.68rem; color:var(--muted); text-align:right; letter-spacing:.08em;
+  }
+  .course-arrow { text-align:right; color:var(--muted); transition:color .25s; }
+  .course-row:hover .course-arrow { color:var(--accent2); }
+
+  /* ─── PROCESS ─── */
+  #process {
+    position:relative; z-index:1;
+    padding: 4rem 3rem 6rem;
+    background:rgba(255,255,255,0.015);
+    border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+  }
+  .process-grid {
+    display:grid; grid-template-columns:repeat(4,1fr); gap:3rem; margin-top:4rem;
+  }
+  .process-step { position:relative; }
+  .process-step::after {
+    content:''; position:absolute; top:1.5rem; left:calc(100% + 1.5rem);
+    width:calc(3rem - 3rem); height:1px; background:var(--border);
+  }
+  .step-num {
+    font-family:'Bebas Neue',sans-serif; font-size:4rem; line-height:1;
+    color:transparent; -webkit-text-stroke:1px rgba(255,255,255,0.1);
+    margin-bottom:1rem;
+  }
+  .step-title { font-size:1.05rem; font-weight:700; margin-bottom:.6rem; }
+  .step-desc { font-size:.82rem; font-weight:300; color:var(--muted); line-height:1.65; }
+
+  /* ─── CTA SECTION ─── */
+  #cta {
+    position:relative; z-index:1;
+    padding: 8rem 3rem;
+    text-align:center; overflow:hidden;
+  }
+  #cta::before {
+    content:'';
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:600px; height:600px;
+    background: radial-gradient(ellipse, rgba(255,77,28,0.12) 0%, transparent 70%);
+    pointer-events:none;
+  }
+  .cta-title {
+    font-family:'Bebas Neue',sans-serif;
+    font-size:clamp(4rem,10vw,10rem); line-height:.9;
+    margin-bottom:2rem;
+  }
+  .cta-title .outline { color:transparent; -webkit-text-stroke:1px var(--fg); }
+  .cta-sub { font-size:1rem; font-weight:300; color:var(--muted); margin-bottom:3rem; }
+  .cta-buttons { display:flex; gap:1rem; justify-content:center; flex-wrap:wrap; }
+  .btn-primary {
+    font-family:'JetBrains Mono',monospace; font-size:.8rem; letter-spacing:.12em; text-transform:uppercase;
+    padding:.9rem 2.5rem;
+    background: var(--accent1); color:var(--fg);
+    border:none; cursor:none;
+    transition:transform .2s, background .2s;
+    text-decoration:none; display:inline-block;
+  }
+  .btn-primary:hover { background:#ff6a3d; transform:translateY(-2px); }
+  .btn-secondary {
+    font-family:'JetBrains Mono',monospace; font-size:.8rem; letter-spacing:.12em; text-transform:uppercase;
+    padding:.9rem 2.5rem;
+    border:1px solid var(--border); color:var(--fg);
+    background:transparent; cursor:none;
+    transition: border-color .2s, transform .2s;
+    text-decoration:none; display:inline-block;
+  }
+  .btn-secondary:hover { border-color:var(--fg); transform:translateY(-2px); }
+
+  /* ─── FOOTER ─── */
+  footer {
+    position:relative; z-index:1;
+    border-top:1px solid var(--border);
+    padding: 3rem;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .footer-logo {
+    font-family:'Bebas Neue',sans-serif; font-size:1.4rem; letter-spacing:.1em; color:var(--fg);
+  }
+  .footer-logo span { color:var(--accent2); }
+  .footer-copy { font-family:'JetBrains Mono',monospace; font-size:.65rem; color:var(--muted); letter-spacing:.08em; }
+  .footer-links { display:flex; gap:2rem; list-style:none; }
+  .footer-links a { font-family:'JetBrains Mono',monospace; font-size:.65rem; color:var(--muted); text-decoration:none; letter-spacing:.08em; transition:color .25s; }
+  .footer-links a:hover { color:var(--fg); }
+
+  /* ─── NOISE OVERLAY ─── */
+  .noise {
+    position:fixed; inset:0; z-index:200; pointer-events:none;
+    opacity:.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-repeat:repeat;
+    background-size:200px;
+    animation: noiseShift 8s steps(1) infinite;
+  }
+  @keyframes noiseShift { 0%{background-position:0 0} 25%{background-position:-30px 20px} 50%{background-position:20px -10px} 75%{background-position:-10px 30px} 100%{background-position:0 0} }
+
+  /* ─── KEYFRAMES ─── */
+  @keyframes fadeUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:none} }
+
+  /* ─── RESPONSIVE ─── */
+  @media(max-width:1024px){
+    .clusters-grid { grid-template-columns:repeat(2,1fr); }
+    #stats { grid-template-columns:repeat(2,1fr); }
+    .process-grid { grid-template-columns:repeat(2,1fr); }
+    .course-row { grid-template-columns:60px 1fr 140px; }
+    .course-level,.course-arrow { display:none; }
+  }
+  @media(max-width:640px){
+    nav { padding:1rem 1.5rem; }
+    .nav-links,.nav-cta { display:none; }
+    .section-header { flex-direction:column; padding:4rem 1.5rem 2rem; }
+    #clusters { padding:1rem 1.5rem 4rem; }
+    .clusters-grid { grid-template-columns:1fr; }
+    #featured,.cta-buttons { padding: 0 1.5rem 4rem; }
+    #stats { grid-template-columns:repeat(2,1fr); }
+    .course-row { padding:1.2rem 1.5rem; grid-template-columns:50px 1fr 40px; }
+    footer { flex-direction:column; gap:1.5rem; text-align:center; }
+    .footer-links { flex-wrap:wrap; justify-content:center; }
+    .process-grid { grid-template-columns:1fr; }
+    #process { padding:3rem 1.5rem 4rem; }
+    #cta { padding:5rem 1.5rem; }
+  }
+
+  /* ─── GLOW LINES DECORATION ─── */
+  .glow-line {
+    position:absolute; height:1px; background:linear-gradient(to right, transparent, var(--accent2), transparent);
+    opacity:.15; pointer-events:none;
+  }
+</style>
+</head>
+<body>
+
+<div class="noise"></div>
+<div id="cursor"><div id="cursor-dot"></div><div id="cursor-ring"></div></div>
+<canvas id="bg-canvas"></canvas>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">ПОД<span>КУРСЫ</span></a>
+  <ul class="nav-links">
+    <li><a href="#clusters">Кластеры</a></li>
+    <li><a href="#featured">Курсы</a></li>
+    <li><a href="#process">Процесс</a></li>
+    <li><a href="#cta">Старт</a></li>
+  </ul>
+  <a href="#cta" class="nav-cta">Начать обучение</a>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <p class="hero-tag">// система образовательных кластеров</p>
+  <h1 class="hero-title">
+    <span>ТВОИ</span>
+    <span class="line2">ПОД<span class="accent-word">КУРСЫ</span></span>
+  </h1>
+  <p class="hero-sub">Погружайся в знания через 6 кластеров дисциплин. Каждый подкурс — это живой опыт, интерактивная среда и трансформация мышления.</p>
+  <div class="hero-scroll">
+    <span>Scroll</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<!-- MARQUEE -->
+<div class="marquee-wrap">
+  <div class="marquee-inner">
+    <span class="marquee-item">ТЕХНОЛОГИИ <span>✦</span></span>
+    <span class="marquee-item">ДИЗАЙН <span>✦</span></span>
+    <span class="marquee-item">БИЗНЕС <span>✦</span></span>
+    <span class="marquee-item">НАУКА <span>✦</span></span>
+    <span class="marquee-item">ТВОРЧЕСТВО <span>✦</span></span>
+    <span class="marquee-item">ЗДОРОВЬЕ <span>✦</span></span>
+    <span class="marquee-item">6 КЛАСТЕРОВ <span>✦</span></span>
+    <span class="marquee-item">48 ПОДКУРСОВ <span>✦</span></span>
+    <span class="marquee-item">ТЕХНОЛОГИИ <span>✦</span></span>
+    <span class="marquee-item">ДИЗАЙН <span>✦</span></span>
+    <span class="marquee-item">БИЗНЕС <span>✦</span></span>
+    <span class="marquee-item">НАУКА <span>✦</span></span>
+    <span class="marquee-item">ТВОРЧЕСТВО <span>✦</span></span>
+    <span class="marquee-item">ЗДОРОВЬЕ <span>✦</span></span>
+    <span class="marquee-item">6 КЛАСТЕРОВ <span>✦</span></span>
+    <span class="marquee-item">48 ПОДКУРСОВ <span>✦</span></span>
+  </div>
+</div>
+
+<!-- STATS -->
+<div id="stats">
+  <div class="stat"><div class="stat-num">6<span class="unit">+</span></div><div class="stat-label">Кластеров</div></div>
+  <div class="stat"><div class="stat-num">48<span class="unit">+</span></div><div class="stat-label">Подкурсов</div></div>
+  <div class="stat"><div class="stat-num">320<span class="unit">+</span></div><div class="stat-label">Часов контента</div></div>
+  <div class="stat"><div class="stat-num">12<span class="unit">K</span></div><div class="stat-label">Студентов</div></div>
+</div>
+
+<!-- CLUSTERS -->
+<div class="section-header" id="clusters-header">
+  <div>
+    <p class="section-eyebrow">// 01 — Кластеры</p>
+    <h2 class="section-title">ВСЕ<br>КЛАСТЕРЫ</h2>
+  </div>
+  <p class="section-desc">Шесть образовательных направлений, каждое из которых открывает новый способ видеть мир и создавать будущее.</p>
+</div>
+
+<section id="clusters">
+  <div class="clusters-grid">
+
+    <!-- 1 ТЕХНОЛОГИИ -->
+    <div class="card" data-cluster="1">
+      <div class="card-num">01 / 06</div>
+      <span class="card-icon">⚡</span>
+      <h3 class="card-title card-title-color-1">Технологии</h3>
+      <p class="card-desc">Программирование, ИИ, веб-разработка, кибербезопасность и облачные системы. Стань архитектором цифрового мира.</p>
+      <div class="card-tags">
+        <span class="tag">Python</span>
+        <span class="tag">AI / ML</span>
+        <span class="tag">DevOps</span>
+        <span class="tag">Веб</span>
+        <span class="tag">Security</span>
+      </div>
+      <div class="card-footer">
+        <span class="card-courses">9 подкурсов</span>
+        <div class="card-arrow">→</div>
+      </div>
+    </div>
+
+    <!-- 2 ДИЗАЙН -->
+    <div class="card" data-cluster="2">
+      <div class="card-num">02 / 06</div>
+      <span class="card-icon" style="animation-delay:.5s">🎨</span>
+      <h3 class="card-title card-title-color-2">Дизайн</h3>
+      <p class="card-desc">UX/UI, графика, моушн-дизайн, 3D-визуализация и брендинг. Создавай визуальный язык, который говорит сам за себя.</p>
+      <div class="card-tags">
+        <span class="tag">UX/UI</span>
+        <span class="tag">Figma</span>
+        <span class="tag">3D</span>
+        <span class="tag">Брендинг</span>
+        <span class="tag">Motion</span>
+      </div>
+      <div class="card-footer">
+        <span class="card-courses">8 подкурсов</span>
+        <div class="card-arrow">→</div>
+      </div>
+    </div>
+
+    <!-- 3 БИЗНЕС -->
+    <div class="card" data-cluster="3">
+      <div class="card-num">03 / 06</div>
+      <span class="card-icon" style="animation-delay:1s">📊</span>
+      <h3 class="card-title card-title-color-3">Бизнес</h3>
+      <p class="card-desc">Стратегия, маркетинг, финансы, менеджмент и предпринимательство. Учись мыслить системно и масштабировать идеи.</p>
+      <div class="card-tags">
+        <span class="tag">Стратегия</span>
+        <span class="tag">Маркетинг</span>
+        <span class="tag">Финансы</span>
+        <span class="tag">Стартап</span>
+      </div>
+      <div class="card-footer">
+        <span class="card-courses">8 подкурсов</span>
+        <div class="card-arrow">→</div>
+      </div>
+    </div>
+
+    <!-- 4 НАУКА -->
+    <div class="card" data-cluster="4">
+      <div class="card-num">04 / 06</div>
+      <span class="card-icon" style="animation-delay:1.5s">🔬</span>
+      <h3 class="card-title card-title-color-4">Наука</h3>
+      <p class="card-desc">Математика, физика, биология, химия и data science. Постигай фундаментальные законы и применяй их на практике.</p>
+      <div class="card-tags">
+        <span class="tag">Математика</span>
+        <span class="tag">Data Science</span>
+        <span class="tag">Физика</span>
+        <span class="tag">Биология</span>
+      </div>
+      <div class="card-footer">
+        <span class="card-courses">8 подкурсов</span>
+        <div class="card-arrow">→</div>
+      </div>
+    </div>
+
+    <!-- 5 ТВОРЧЕСТВО -->
+    <div class="card" data-cluster="5">
+      <div class="card-num">05 / 06</div>
+      <span class="card-icon" style="animation-delay:2s">✍️</span>
+      <h3 class="card-title card-title-color-5">Творчество</h3>
+      <p class="card-desc">Писательство, музыка, видеопроизводство, фотография и сторителлинг. Превращай эмоции в произведения.</p>
+      <div class="card-tags">
+        <span class="tag">Сторителлинг</span>
+        <span class="tag">Видео</span>
+        <span class="tag">Музыка</span>
+        <span class="tag">Фото</span>
+      </div>
+      <div class="card-footer">
+        <span class="card-courses">7 подкурсов</span>
+        <div class="card-arrow">→</div>
+      </div>
+    </div>
+
+    <!-- 6 ЗДОРОВЬЕ -->
+    <div class="card" data-cluster="6">
+      <div class="card-num">06 / 06</div>
+      <span class="card-icon" style="animation-delay:2.5s">🧬</span>
+      <h3 class="card-title card-title-color-6">Здоровье</h3>
+      <p class="card-desc">Психология, нутрициология, спортивные науки и нейробиология. Инвестируй в самый ценный актив — себя.</p>
+      <div class="card-tags">
+        <span class="tag">Психология</span>
+        <span class="tag">Нейронаука</span>
+        <span class="tag">Питание</span>
+        <span class="tag">Спорт</span>
+      </div>
+      <div class="card-footer">
+        <span class="card-courses">8 подкурсов</span>
+        <div class="card-arrow">→</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- FEATURED COURSES -->
+<div class="section-header">
+  <div>
+    <p class="section-eyebrow">// 02 — Подкурсы</p>
+    <h2 class="section-title">ТОП<br>КУРСОВ</h2>
+  </div>
+  <p class="section-desc">Самые популярные подкурсы, которые открывают студенты первыми. Выбери своё направление и начни прямо сейчас.</p>
+</div>
+
+<section id="featured">
+  <div class="featured-list">
+    <div class="course-row"><span class="course-idx">001</span><span class="course-name">Введение в Python и алгоритмическое мышление</span><span class="course-cluster">Технологии</span><span class="course-level">Начальный</span><span class="course-arrow">→</span></div>
+    <div class="course-row"><span class="course-idx">002</span><span class="course-name">UX Research: от идеи до прототипа</span><span class="course-cluster">Дизайн</span><span class="course-level">Базовый</span><span class="course-arrow">→</span></div>
+    <div class="course-row"><span class="course-idx">003</span><span class="course-name">Машинное обучение без математики страха</span><span class="course-cluster">Технологии</span><span class="course-level">Средний</span><span class="course-arrow">→</span></div>
+    <div class="course-row"><span class="course-idx">004</span><span class="course-name">Стратегический маркетинг нового времени</span><span class="course-cluster">Бизнес</span><span class="course-level">Средний</span><span class="course-arrow">→</span></div>
+    <div class="course-row"><span class="course-idx">005</span><span class="course-name">3D и моушн для веба: Three.js практикум</span><span class="course-cluster">Дизайн</span><span class="course-level">Продвинутый</span><span class="course-arrow">→</span></div>
+    <div class="course-row"><span class="course-idx">006</span><span class="course-name">Нейронаука продуктивности и фокуса</span><span class="course-cluster">Здоровье</span><span class="course-level">Базовый</span><span class="course-arrow">→</span></div>
+    <div class="course-row"><span class="course-idx">007</span><span class="course-name">Data Storytelling: данные как нарратив</span><span class="course-cluster">Наука</span><span class="course-level">Средний</span><span class="course-arrow">→</span></div>
+    <div class="course-row"><span class="course-idx">008</span><span class="course-name">Визуальный сторителлинг и режиссура кадра</span><span class="course-cluster">Творчество</span><span class="course-level">Базовый</span><span class="course-arrow">→</span></div>
+  </div>
+</section>
+
+<!-- PROCESS -->
+<section id="process">
+  <div class="section-header" style="padding:0 0 0 0;">
+    <div>
+      <p class="section-eyebrow">// 03 — Как это работает</p>
+      <h2 class="section-title">КАК МЫ<br>УЧИМ</h2>
+    </div>
+    <p class="section-desc">Четыре шага от нулевого старта до реального результата.</p>
+  </div>
+  <div class="process-grid">
+    <div class="process-step">
+      <div class="step-num">01</div>
+      <h3 class="step-title">Диагностика</h3>
+      <p class="step-desc">Персональный тест определяет твой уровень и цели. Алгоритм строит индивидуальный маршрут по кластерам.</p>
+    </div>
+    <div class="process-step">
+      <div class="step-num">02</div>
+      <h3 class="step-title">Погружение</h3>
+      <p class="step-desc">Иммерсивные видеоуроки, интерактивные симуляции и живые практические задания от реальных экспертов.</p>
+    </div>
+    <div class="process-step">
+      <div class="step-num">03</div>
+      <h3 class="step-title">Практика</h3>
+      <p class="step-desc">Реальные проекты в коллаборации с другими студентами. Каждый курс заканчивается артефактом в портфолио.</p>
+    </div>
+    <div class="process-step">
+      <div class="step-num">04</div>
+      <h3 class="step-title">Рост</h3>
+      <p class="step-desc">Менторы, комьюнити и карьерные партнёры помогают перевести знания в профессиональный результат.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section id="cta">
+  <h2 class="cta-title">НАЧНИ<br><span class="outline">СЕГОДНЯ</span></h2>
+  <p class="cta-sub">Выбери кластер. Открой подкурс. Измени траекторию.</p>
+  <div class="cta-buttons">
+    <a href="#clusters" class="btn-primary">Выбрать кластер</a>
+    <a href="#featured" class="btn-secondary">Смотреть курсы</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">ПОД<span>КУРСЫ</span></div>
+  <ul class="footer-links">
+    <li><a href="#">О платформе</a></li>
+    <li><a href="#">Партнёрам</a></li>
+    <li><a href="#">Преподавателям</a></li>
+    <li><a href="#">Контакты</a></li>
+  </ul>
+  <p class="footer-copy">© 2025 — Система кластерного обучения</p>
+</footer>
+
+<script>
+// ─── CUSTOM CURSOR ───
+const cursor = document.getElementById('cursor');
+const dot = document.getElementById('cursor-dot');
+const ring = document.getElementById('cursor-ring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove', e=>{mx=e.clientX;my=e.clientY;dot.style.left=mx+'px';dot.style.top=my+'px';});
+(function animateCursor(){rx+=(mx-rx)*.12;ry+=(my-ry)*.12;ring.style.left=rx+'px';ring.style.top=ry+'px';requestAnimationFrame(animateCursor);})();
+
+// ─── BACKGROUND CANVAS: PARTICLES + CONNECTIONS ───
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+let W,H,particles=[];
+function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+resize(); window.addEventListener('resize',resize);
+
+const COLORS=['rgba(0,229,255,','rgba(255,77,28,','rgba(184,255,58,'];
+class Particle{
+  constructor(){this.reset();}
+  reset(){
+    this.x=Math.random()*W; this.y=Math.random()*H;
+    this.vx=(Math.random()-.5)*.3; this.vy=(Math.random()-.5)*.3;
+    this.r=Math.random()*1.2+.3;
+    this.color=COLORS[Math.floor(Math.random()*COLORS.length)];
+    this.life=Math.random()*200+100; this.age=0;
+  }
+  update(){this.x+=this.vx;this.y+=this.vy;this.age++;if(this.age>this.life||this.x<0||this.x>W||this.y<0||this.y>H)this.reset();}
+  draw(){const a=Math.sin(this.age/this.life*Math.PI)*.7;ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,Math.PI*2);ctx.fillStyle=this.color+a+')';ctx.fill();}
+}
+for(let i=0;i<120;i++)particles.push(new Particle());
+
+function drawConnections(){
+  for(let i=0;i<particles.length;i++){
+    for(let j=i+1;j<particles.length;j++){
+      const dx=particles[i].x-particles[j].x,dy=particles[i].y-particles[j].y;
+      const d=Math.sqrt(dx*dx+dy*dy);
+      if(d<110){
+        const a=(1-d/110)*.08;
+        ctx.beginPath();ctx.moveTo(particles[i].x,particles[i].y);ctx.lineTo(particles[j].x,particles[j].y);
+        ctx.strokeStyle=`rgba(0,229,255,${a})`;ctx.lineWidth=.5;ctx.stroke();
+      }
+    }
+  }
+}
+
+function loop(){
+  ctx.clearRect(0,0,W,H);
+  drawConnections();
+  particles.forEach(p=>{p.update();p.draw();});
+  requestAnimationFrame(loop);
+}
+loop();
+
+// ─── SCROLL REVEAL ───
+const observer=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting) e.target.classList.add('visible');
+  });
+},{threshold:.1});
+document.querySelectorAll('.stat,.course-row').forEach(el=>observer.observe(el));
+
+// ─── STAGGERED CARD ENTRANCE ───
+const cardObserver=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      const cards=e.target.querySelectorAll('.card');
+      cards.forEach((c,i)=>{
+        c.style.opacity='0';c.style.transform='translateY(30px)';c.style.transition=`opacity .6s ${i*.1}s, transform .6s ${i*.1}s, background .3s`;
+        setTimeout(()=>{c.style.opacity='1';c.style.transform='none';},50);
+      });
+    }
+  });
+},{threshold:.05});
+const grid=document.querySelector('.clusters-grid');
+if(grid)cardObserver.observe(grid);
+
+// ─── PARALLAX HERO TITLE ───
+window.addEventListener('scroll',()=>{
+  const s=window.scrollY;
+  const title=document.querySelector('.hero-title');
+  if(title)title.style.transform=`translateY(${s*.25}px)`;
+});
+</script>
+</body>
+</html>
